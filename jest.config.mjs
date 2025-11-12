@@ -1,4 +1,4 @@
-/** @type {import("ts-jest").JestConfig} **/
+/** @type {import('jest').Config} */
 export default {
   preset: "ts-jest/presets/default-esm",
   testEnvironment: "node",
@@ -8,7 +8,6 @@ export default {
       "ts-jest",
       {
         useESM: true,
-        tsconfig: "./tsconfig.json",
       },
     ],
   },
