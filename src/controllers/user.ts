@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { User } from '../types.js'
 
-let users: User[] = [
+export let users: User[] = [
   { id: 1, name: 'Alice', email: 'alice@mail.com' },
   { id: 2, name: 'Bob', email: 'bob@mail.com' },
 ]
