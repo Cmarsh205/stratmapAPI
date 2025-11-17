@@ -32,4 +32,22 @@ describe('createUser', () => {
       status: 201,
     });
   });
+
+  it('should not create user and should return 400 if no email', async () => {
+    const body = { name: '' } as any; 
+  
+    const c = mockContext(body);
+  
+    const res = await createUser(c);
+  
+    expect(c.req.json).toHaveBeenCalled();
+    expect(users.length).toBe(0); 
+    expect(res).toEqual({
+      data: {
+        status: 'fail',
+        message: 'Name and email are required',
+      },
+      status: 400,
+    });
+  });
 });

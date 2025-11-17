@@ -22,6 +22,17 @@ export const getUser = (c: Context) => {
 // POST 
 export const createUser = async (c: Context) => {
   const body = await c.req.json<User>()
+
+  if (!body.name || !body.email) {
+    return c.json(
+      {
+        status: 'fail',
+        message: 'Name and email are required',
+      },
+      400
+    );
+  }
+
   const newUser = { ...body, id: users.length + 1 }
   users.push(newUser)
   return c.json({ status: 'success', data: newUser }, 201)
@@ -40,7 +51,22 @@ export const updateUser = async (c: Context) => {
 
 // DELETE 
 export const deleteUser = (c: Context) => {
-  const id = Number(c.req.param('id'))
-  users = users.filter(u => u.id !== id)
-  return c.json({ status: 'success', message: `User ${id} deleted` })
-}
+  const id = Number(c.req.param('id'));
+  const exists = users.some((u) => u.id === id);
+
+  if (!exists) {
+    return c.json(
+      { status: 'fail', message: 'User not found' },
+      404
+    );
+  }
+
+  const remaining = users.filter((u) => u.id !== id);
+  users.length = 0;
+  users.push(...remaining);
+
+  return c.json(
+    { status: 'success', message: `User ${id} deleted` },
+    200
+  );
+};
