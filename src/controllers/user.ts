@@ -8,15 +8,15 @@ export let users: User[] = [
 
 // GET 
 export const getUsers = (c: Context) => {
-  return c.json({ status: 'success', data: users })
+  return c.json({ status: 'success', data: users }, 200)
 }
 
 // GET by ID
-export const getUser = (c: Context) => {
+export const getUserById = (c: Context) => {
   const id = Number(c.req.param('id'))
   const user = users.find(u => u.id === id)
   if (!user) return c.json({ status: 'error', message: 'User not found' }, 404)
-  return c.json({ status: 'success', data: user })
+  return c.json({ status: 'success', data: user }, 200)
 }
 
 // POST 
