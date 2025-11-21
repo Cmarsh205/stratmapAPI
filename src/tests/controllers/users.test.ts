@@ -114,17 +114,17 @@ describe('getUsers', () => {
     users.length = 0
   })
 
-  it('should return an empty list when no users exist', async () => {
+  it('should return 404 when no users exist', async () => {
     const c = mockGetAllContext()
 
     const res = await getUsers(c)
 
     expect(res).toEqual({
       data: {
-        status: 'success',
-        data: [],
+        status: 'error',
+        message: 'No users found',
       },
-      status: 200,
+      status: 404,
     })
   })
 

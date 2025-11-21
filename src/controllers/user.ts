@@ -8,6 +8,9 @@ export let users: User[] = [
 
 // GET 
 export const getUsers = (c: Context) => {
+  if (users.length === 0) {
+    return c.json({ status: 'error', message: 'No users found' }, 404)
+  }
   return c.json({ status: 'success', data: users }, 200)
 }
 
