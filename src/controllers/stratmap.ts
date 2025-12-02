@@ -26,7 +26,7 @@ export const getStratmap = (c: Context) => {
 export const createStratmap = async (c: Context) => {
     const body = await c.req.json<Stratmap>()
     if (!body.title || !body.description || !body.map) {
-        return c.json({ status: 'error', message: 'Title, description, and map are required' }, 400)
+        return c.json({ status: 'error', message: 'Title, description, and map are required' }, 404)
     }
     const newStratmap = { ...body, id: stratmaps.length + 1, createdAt: new Date(), updatedAt: new Date() }
     stratmaps.push(newStratmap)
