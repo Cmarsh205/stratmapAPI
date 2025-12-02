@@ -49,7 +49,7 @@ export const updateUser = async (c: Context) => {
   if (index === -1) return c.json({ status: 'error', message: 'User not found' }, 404)
 
   users[index] = { ...users[index], ...body }
-  return c.json({ status: 'success', data: users[index] })
+  return c.json({ status: 'success', data: users[index] }, 200)
 }
 
 // DELETE 

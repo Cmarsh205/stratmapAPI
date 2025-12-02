@@ -11,7 +11,7 @@ export const getStratmaps = (c: Context) => {
     if (stratmaps.length === 0) {
         return c.json({ status: 'error', message: 'No stratmaps found' }, 404)
     }
-    return c.json({ status: 'success', data: stratmaps })
+    return c.json({ status: 'success', data: stratmaps }, 200)
 }
 
 // GET by ID
@@ -19,14 +19,14 @@ export const getStratmap = (c: Context) => {
     const id = Number(c.req.param('id'))
     const stratmap = stratmaps.find(stratmap => stratmap.id === id)
     if (!stratmap) return c.json({ status: 'error', message: 'Stratmap not found' }, 404)
-    return c.json({ status: 'success', data: stratmap })
+    return c.json({ status: 'success', data: stratmap }, 200)
 }
 
 // POST 
 export const createStratmap = async (c: Context) => {
     const body = await c.req.json<Stratmap>()
     if (!body.title || !body.description || !body.map) {
-        return c.json({ status: 'error', message: 'Title, description, and map are required' }, 404)
+        return c.json({ status: 'error', message: 'Title, description, and map are required' }, 400)
     }
     const newStratmap = { ...body, id: stratmaps.length + 1, createdAt: new Date(), updatedAt: new Date() }
     stratmaps.push(newStratmap)
@@ -40,7 +40,7 @@ export const updateStratmap = async (c: Context) => {
     const index = stratmaps.findIndex(stratmap => stratmap.id === id)
     if (index === -1) return c.json({ status: 'error', message: 'Stratmap not found' }, 404)
     stratmaps[index] = { ...stratmaps[index], ...body, updatedAt: new Date() }
-    return c.json({ status: 'success', data: stratmaps[index] })
+    return c.json({ status: 'success', data: stratmaps[index] }, 200)
 }
 
 // DELETE
@@ -53,5 +53,5 @@ export const deleteStratmap = (c: Context) => {
     }
     
     stratmaps = stratmaps.filter(stratmap => stratmap.id !== id)
-    return c.json({ status: 'success', message: `Stratmap ${id} deleted` })
+    return c.json({ status: 'success', message: `Stratmap ${id} deleted` }, 200)
 }
