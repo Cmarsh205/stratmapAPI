@@ -1,72 +1,46 @@
 import type { Context } from 'hono'
 import type { User } from '../types.js'
-
-export let users: User[] = [
-  { id: 1, name: 'Alice', email: 'alice@mail.com' },
-  { id: 2, name: 'Bob', email: 'bob@mail.com' },
-]
+import { pool } from '../database/database.js'
 
 // GET 
-export const getUsers = (c: Context) => {
-  if (users.length === 0) {
-    return c.json({ status: 'error', message: 'No users found' }, 404)
-  }
-  return c.json({ status: 'success', data: users }, 200)
+export const getUsers = async (c: Context) => {
+  const result = await pool.query('SELECT * FROM users')
+  return c.json({ status: 'success', data: result.rows }, 200)
 }
 
 // GET by ID
-export const getUserById = (c: Context) => {
+export const getUserById = async (c: Context) => {
   const id = Number(c.req.param('id'))
-  const user = users.find(u => u.id === id)
-  if (!user) return c.json({ status: 'error', message: 'User not found' }, 404)
-  return c.json({ status: 'success', data: user }, 200)
+  const result = await pool.query('SELECT * FROM users WHERE id = $1', [id])
+  if (!result.rows.length) return c.json({ status: 'error', message: 'User not found' }, 404)
+  return c.json({ status: 'success', data: result.rows[0] }, 200)
 }
 
 // POST 
 export const createUser = async (c: Context) => {
   const body = await c.req.json<User>()
-
   if (!body.name || !body.email) {
-    return c.json(
-      {
-        status: 'fail',
-        message: 'Name and email are required',
-      },
-      400
-    );
+    return c.json({ status: 'error', message: 'Name and email are required' }, 400)
   }
-
-  const newUser = { ...body, id: users.length + 1 }
-  users.push(newUser)
-  return c.json({ status: 'success', data: newUser }, 201)
+  const result = await pool.query('INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *', [body.name, body.email])
+  return c.json({ status: 'success', data: result.rows[0] }, 201)
 }
 
 // PUT 
 export const updateUser = async (c: Context) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json<Partial<User>>()
-  const index = users.findIndex(u => u.id === id)
-  if (index === -1) return c.json({ status: 'error', message: 'User not found' }, 404)
+  const result = await pool.query('UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING *', [body.name, body.email, id])
+  if (!result.rows.length) return c.json({ status: 'error', message: 'User not found' }, 404)
 
-  users[index] = { ...users[index], ...body }
-  return c.json({ status: 'success', data: users[index] }, 200)
+  return c.json({ status: 'success', data: result.rows[0] }, 200)
 }
 
 // DELETE 
-export const deleteUser = (c: Context) => {
+export const deleteUser = async (c: Context) => {
   const id = Number(c.req.param('id'));
-  const exists = users.some((u) => u.id === id);
-
-  if (!exists) {
-    return c.json(
-      { status: 'fail', message: 'User not found' },
-      404
-    );
-  }
-
-  const remaining = users.filter((u) => u.id !== id);
-  users.length = 0;
-  users.push(...remaining);
+  const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING *', [id])
+  if (!result.rows.length) return c.json({ status: 'error', message: 'User not found' }, 404)
 
   return c.json(
     { status: 'success', message: `User ${id} deleted` },
