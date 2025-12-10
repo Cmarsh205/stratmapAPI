@@ -11,7 +11,7 @@ export const getUsers = async (c: Context) => {
 // GET by ID
 export const getUserById = async (c: Context) => {
   const id = Number(c.req.param('id'))
-  const result = await pool.query('SELECT * FROM users WHERE id = $1', [id])
+  const result = await pool.query('SELECT * FROM users WHERE user_id = $1', [id])
   if (!result.rows.length) return c.json({ status: 'error', message: 'User not found' }, 404)
   return c.json({ status: 'success', data: result.rows[0] }, 200)
 }
@@ -19,10 +19,10 @@ export const getUserById = async (c: Context) => {
 // POST 
 export const createUser = async (c: Context) => {
   const body = await c.req.json<User>()
-  if (!body.name || !body.email) {
-    return c.json({ status: 'error', message: 'Name and email are required' }, 400)
+  if (!body.username || !body.email) {
+    return c.json({ status: 'error', message: 'Username and email are required' }, 400)
   }
-  const result = await pool.query('INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *', [body.name, body.email])
+  const result = await pool.query('INSERT INTO users (username, email) VALUES ($1, $2) RETURNING *', [body.username, body.email])
   return c.json({ status: 'success', data: result.rows[0] }, 201)
 }
 
@@ -30,16 +30,15 @@ export const createUser = async (c: Context) => {
 export const updateUser = async (c: Context) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json<Partial<User>>()
-  const result = await pool.query('UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING *', [body.name, body.email, id])
+  const result = await pool.query('UPDATE users SET username = $1, email = $2 WHERE user_id = $3 RETURNING *', [body.username, body.email, id])
   if (!result.rows.length) return c.json({ status: 'error', message: 'User not found' }, 404)
-
   return c.json({ status: 'success', data: result.rows[0] }, 200)
 }
 
 // DELETE 
 export const deleteUser = async (c: Context) => {
   const id = Number(c.req.param('id'));
-  const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING *', [id])
+  const result = await pool.query('DELETE FROM users WHERE user_id = $1 RETURNING *', [id])
   if (!result.rows.length) return c.json({ status: 'error', message: 'User not found' }, 404)
 
   return c.json(
