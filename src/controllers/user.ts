@@ -30,8 +30,14 @@ export const createUser = async (c: Context) => {
 export const updateUser = async (c: Context) => {
   const id = Number(c.req.param('id'))
   const body = await c.req.json<Partial<User>>()
-  const result = await pool.query('UPDATE users SET username = $1, email = $2 WHERE user_id = $3 RETURNING *', [body.username, body.email, id])
-  if (!result.rows.length) return c.json({ status: 'error', message: 'User not found' }, 404)
+  
+  const currentUser = await pool.query('SELECT * FROM users WHERE user_id = $1', [id])
+  if (!currentUser.rows.length) return c.json({ status: 'error', message: 'User not found' }, 404)
+  
+  const username = body.username ?? currentUser.rows[0].username
+  const email = body.email ?? currentUser.rows[0].email
+  
+  const result = await pool.query('UPDATE users SET username = $1, email = $2 WHERE user_id = $3 RETURNING *', [username, email, id])
   return c.json({ status: 'success', data: result.rows[0] }, 200)
 }
 
