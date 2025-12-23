@@ -5,7 +5,7 @@ import { cors } from 'hono/cors'
 
 import userRouter from './routers/user.js'
 import stratmapRouter from './routers/stratmap.js'
-import { authMiddleware } from './auth.js'
+import { requireAuth } from './middleware/auth.js'
 
 const app = new Hono()
 
@@ -20,8 +20,10 @@ app.use(
 
 app.get('/', c => c.text('Hono User API Running 🚀'))
 
+app.use('/api/v1/users/*', requireAuth)
 app.route('/api/v1/users', userRouter)
-app.use('/api/v1/stratmaps/*', authMiddleware)
+
+app.use('/api/v1/stratmaps/*', requireAuth)
 app.route('/api/v1/stratmaps', stratmapRouter)
 
 serve(
