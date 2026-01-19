@@ -1,183 +1,196 @@
-import { jest } from '@jest/globals';
-import { createUser, deleteUser, getUsers, users, getUserById, updateUser } from '../../controllers/user.js';
-import type { Context } from 'hono';
-import type { User } from '../../types.js';
+import { jest } from '@jest/globals'
+import type { Context } from 'hono'
+import type { User } from '../../types.js'
 
-//Create User
-const mockContext = (jsonBody: Omit<User, 'id'>) => {
-  return {
+type QueryResult = { rows: any[] }
+const mockQuery = jest.fn<(...args: any[]) => Promise<QueryResult>>()
+
+// IMPORTANT: controllers import `pool` from `../database/database.js` (ESM),
+// so we mock that module before importing the controller under test.
+await jest.unstable_mockModule('../../database/database.js', () => ({
+  pool: {
+    query: mockQuery,
+    on: jest.fn(),
+  },
+}))
+
+const { createUser, deleteUser, getUsers, getUserById, updateUser } = await import(
+  '../../controllers/user.js'
+)
+
+const mockJsonContext = () =>
+  ({
+    json: jest.fn((data, status) => ({ data, status })),
+  }) as unknown as Context
+
+// Create User
+const mockCreateContext = (jsonBody: Partial<User>) =>
+  ({
     req: {
-      json: jest.fn<() => Promise<Omit<User, 'id'>>>().mockResolvedValue(jsonBody),
+      json: jest.fn<() => Promise<Partial<User>>>().mockResolvedValue(jsonBody),
     },
     json: jest.fn((data, status) => ({ data, status })),
-  } as unknown as Context;
-};
+  }) as unknown as Context
 
 describe('createUser', () => {
   beforeEach(() => {
-    users.length = 0;
-  });
+    mockQuery.mockReset()
+  })
 
   it('should create a new user and return 201 response', async () => {
-    const body = { name: 'Tom', email: 'tom@mail.com' };
+    const body = { username: 'Tom', email: 'tom@mail.com' }
+    const inserted = { user_id: 1, username: 'Tom', email: 'tom@mail.com' }
 
-    const c = mockContext(body);
+    mockQuery.mockResolvedValueOnce({ rows: [inserted] })
 
-    const res = await createUser(c);
+    const c = mockCreateContext(body)
 
-    expect(c.req.json).toHaveBeenCalled();
-    expect(users.length).toBe(1);
-    expect(users[0]).toEqual({ ...body, id: 1 });
+    const res = await createUser(c)
+
+    expect(c.req.json).toHaveBeenCalled()
+    expect(mockQuery).toHaveBeenCalledWith(
+      'INSERT INTO users (username, email) VALUES ($1, $2) RETURNING *',
+      [body.username, body.email]
+    )
     expect(res).toEqual({
-      data: { status: 'success', data: { ...body, id: 1 } },
+      data: { status: 'success', data: inserted },
       status: 201,
-    });
-  });
+    })
+  })
 
   it('should not create user and should return 400 if no email', async () => {
-    const body = { name: '' } as any; 
-  
-    const c = mockContext(body);
-  
-    const res = await createUser(c);
-  
-    expect(c.req.json).toHaveBeenCalled();
-    expect(users.length).toBe(0); 
+    const body = { username: 'Tom' } as any
+
+    const c = mockCreateContext(body)
+
+    const res = await createUser(c)
+
+    expect(c.req.json).toHaveBeenCalled()
+    expect(mockQuery).not.toHaveBeenCalled()
     expect(res).toEqual({
       data: {
-        status: 'fail',
-        message: 'Name and email are required',
+        status: 'error',
+        message: 'Username and email are required',
       },
       status: 400,
-    });
-  });
-});
+    })
+  })
+})
 
-//Delete User
-const mockDeleteContext = (id: number) => {
-  return {
+// Delete User
+const mockDeleteContext = (id: number) =>
+  ({
     req: {
       param: jest.fn().mockReturnValue(String(id)),
     },
     json: jest.fn((data, status) => ({ data, status })),
-  } as unknown as Context;
-};
+  }) as unknown as Context
  
 describe('deleteUser', () => {
   beforeEach(() => {
-    users.length = 0;
-  });
+    mockQuery.mockReset()
+  })
 
   it('should delete a user and return 200', async () => {
-    users.push({ id: 1, name: 'Tom', email: 'tom@mail.com' });
+    mockQuery.mockResolvedValueOnce({ rows: [{ user_id: 1 }] })
 
-    const c = mockDeleteContext(1);
+    const c = mockDeleteContext(1)
 
-    const res = await deleteUser(c);
+    const res = await deleteUser(c)
 
-    expect(c.req.param).toHaveBeenCalledWith('id');
-    expect(users.length).toBe(0);
+    expect(c.req.param).toHaveBeenCalledWith('id')
+    expect(mockQuery).toHaveBeenCalledWith('DELETE FROM users WHERE user_id = $1 RETURNING *', [1])
     expect(res).toEqual({
       data: {
         status: 'success',
         message: 'User 1 deleted',
       },
       status: 200,
-    });
-  });
-
-  it('should return 404 if user not found', async () => {
-    const c = mockDeleteContext(99);
-
-    const res = await deleteUser(c);
-
-    expect(c.req.param).toHaveBeenCalledWith('id');
-    expect(res).toEqual({
-      data: {
-        status: 'fail',
-        message: 'User not found',
-      },
-      status: 404,
-    });
-  });
-});
-
-//Get all
-const mockGetAllContext = () => {
-  return {
-    json: jest.fn((data, status) => ({ data, status })),
-  } as unknown as Context
-}
-
-describe('getUsers', () => {
-  beforeEach(() => {
-    users.length = 0
+    })
   })
 
-  it('should return 404 when no users exist', async () => {
-    const c = mockGetAllContext()
+  it('should return 404 if user not found', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] })
 
-    const res = await getUsers(c)
+    const c = mockDeleteContext(99)
 
+    const res = await deleteUser(c)
+
+    expect(c.req.param).toHaveBeenCalledWith('id')
+    expect(mockQuery).toHaveBeenCalledWith('DELETE FROM users WHERE user_id = $1 RETURNING *', [99])
     expect(res).toEqual({
       data: {
         status: 'error',
-        message: 'No users found',
+        message: 'User not found',
       },
       status: 404,
     })
   })
+})
 
-  it('should return all users', async () => {
-    users.push(
-      { id: 1, name: 'Tom', email: 'tom@mail.com' },
-      { id: 2, name: 'Jane', email: 'jane@mail.com' }
-    )
+describe('getUsers', () => {
+  beforeEach(() => {
+    mockQuery.mockReset()
+  })
 
-    const c = mockGetAllContext()
+  it('should return all users (empty array is OK)', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] })
 
+    const c = mockJsonContext()
     const res = await getUsers(c)
 
+    expect(mockQuery).toHaveBeenCalledWith('SELECT * FROM users')
     expect(res).toEqual({
-      data: {
-        status: 'success',
-        data: [
-          { id: 1, name: 'Tom', email: 'tom@mail.com' },
-          { id: 2, name: 'Jane', email: 'jane@mail.com' },
-        ],
-      },
+      data: { status: 'success', data: [] },
+      status: 200,
+    })
+  })
+
+  it('should return all users', async () => {
+    const rows = [
+      { user_id: 1, username: 'Tom', email: 'tom@mail.com' },
+      { user_id: 2, username: 'Jane', email: 'jane@mail.com' },
+    ]
+    mockQuery.mockResolvedValueOnce({ rows })
+
+    const c = mockJsonContext()
+    const res = await getUsers(c)
+
+    expect(mockQuery).toHaveBeenCalledWith('SELECT * FROM users')
+    expect(res).toEqual({
+      data: { status: 'success', data: rows },
       status: 200,
     })
   })
 })
 
-//Get by ID
-const mockGetByIdContext = (id: number) => {
-  return {
+// Get by ID
+const mockGetByIdContext = (id: number) =>
+  ({
     req: {
       param: jest.fn().mockReturnValue(String(id)),
     },
     json: jest.fn((data, status) => ({ data, status })),
-  } as unknown as Context
-}
+  }) as unknown as Context
 
 describe('getUserById', () => {
   beforeEach(() => {
-    users.length = 0
+    mockQuery.mockReset()
   })
 
   it('should return a user by ID', async () => {
-    users.push({ id: 1, name: 'Tom', email: 'tom@mail.com' })
+    const row = { user_id: 1, username: 'Tom', email: 'tom@mail.com' }
+    mockQuery.mockResolvedValueOnce({ rows: [row] })
 
     const c = mockGetByIdContext(1)
-
     const res = await getUserById(c)
 
     expect(c.req.param).toHaveBeenCalledWith('id')
+    expect(mockQuery).toHaveBeenCalledWith('SELECT * FROM users WHERE user_id = $1', [1])
     expect(res).toEqual({
       data: {
         status: 'success',
-        data: { id: 1, name: 'Tom', email: 'tom@mail.com' },
+        data: row,
       },
       status: 200,
     })
@@ -185,10 +198,12 @@ describe('getUserById', () => {
 
   it('should return 404 if user not found', async () => {
     const c = mockGetByIdContext(99)
+    mockQuery.mockResolvedValueOnce({ rows: [] })
 
     const res = await getUserById(c)
 
     expect(c.req.param).toHaveBeenCalledWith('id')
+    expect(mockQuery).toHaveBeenCalledWith('SELECT * FROM users WHERE user_id = $1', [99])
     expect(res).toEqual({
       data: {
         status: 'error',
@@ -199,43 +214,48 @@ describe('getUserById', () => {
   })
 })
 
-//Update user
-const mockUpdateContext = (id: number, body: Partial<User>) => {
-  return {
+// Update user
+const mockUpdateContext = (id: number, body: Partial<User>) =>
+  ({
     req: {
       param: jest.fn().mockReturnValue(String(id)),
       json: jest.fn<() => Promise<Partial<User>>>().mockResolvedValue(body),
     },
     json: jest.fn((data, status = 200) => ({ data, status })),
-  } as unknown as Context
-}
+  }) as unknown as Context
 
 describe('updateUser', () => {
   beforeEach(() => {
-    users.length = 0
+    mockQuery.mockReset()
   })
 
   it('should update a user and return 200', async () => {
-    users.push({ id: 1, name: 'Tom', email: 'tom@mail.com' })
+    const existing = { user_id: 1, username: 'Tom', email: 'tom@mail.com' }
+    const updated = { user_id: 1, username: 'Tommy', email: 'tom@mail.com' }
 
-    const body = { name: 'Tommy' }
+    mockQuery
+      .mockResolvedValueOnce({ rows: [existing] }) // SELECT current
+      .mockResolvedValueOnce({ rows: [updated] }) // UPDATE
+
+    const body = { username: 'Tommy' }
     const c = mockUpdateContext(1, body)
 
     const res = await updateUser(c)
 
     expect(c.req.param).toHaveBeenCalledWith('id')
     expect(c.req.json).toHaveBeenCalled()
-    expect(users[0]).toEqual({
-      id: 1,
-      name: 'Tommy',
-      email: 'tom@mail.com',
-    })
+    expect(mockQuery).toHaveBeenNthCalledWith(1, 'SELECT * FROM users WHERE user_id = $1', [1])
+    expect(mockQuery).toHaveBeenNthCalledWith(
+      2,
+      'UPDATE users SET username = $1, email = $2 WHERE user_id = $3 RETURNING *',
+      ['Tommy', 'tom@mail.com', 1]
+    )
     expect(res).toEqual({
       data: {
         status: 'success',
         data: {
-          id: 1,
-          name: 'Tommy',
+          user_id: 1,
+          username: 'Tommy',
           email: 'tom@mail.com',
         },
       },
@@ -245,10 +265,12 @@ describe('updateUser', () => {
 
   it('should return 404 if user not found', async () => {
     const c = mockUpdateContext(99, { name: 'Ghost' })
+    mockQuery.mockResolvedValueOnce({ rows: [] })
 
     const res = await updateUser(c)
 
     expect(c.req.param).toHaveBeenCalledWith('id')
+    expect(mockQuery).toHaveBeenCalledWith('SELECT * FROM users WHERE user_id = $1', [99])
     expect(res).toEqual({
       data: {
         status: 'error',
