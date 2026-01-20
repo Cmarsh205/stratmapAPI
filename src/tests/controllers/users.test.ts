@@ -85,7 +85,7 @@ const mockDeleteContext = (id: number) =>
     },
     json: jest.fn((data, status) => ({ data, status })),
   }) as unknown as Context
- 
+
 describe('deleteUser', () => {
   beforeEach(() => {
     mockQuery.mockReset()
@@ -264,7 +264,7 @@ describe('updateUser', () => {
   })
 
   it('should return 404 if user not found', async () => {
-    const c = mockUpdateContext(99, { name: 'Ghost' })
+    const c = mockUpdateContext(99, { username: 'Ghost' })
     mockQuery.mockResolvedValueOnce({ rows: [] })
 
     const res = await updateUser(c)
