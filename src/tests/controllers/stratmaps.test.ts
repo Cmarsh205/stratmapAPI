@@ -35,12 +35,11 @@ describe('createStratmap', () => {
   })
 
   it('should create a new stratmap and return 201 response', async () => {
-    const body = { title: 'Test Stratmap', description: 'Test Description', map: 'Test Map' }
+    const body = { title: 'Test Stratmap', description: 'Test Description' }
     const inserted = {
       id: 1,
       title: body.title,
       description: body.description,
-      map: body.map,
       created_at: new Date().toISOString(),
     }
 
@@ -52,8 +51,8 @@ describe('createStratmap', () => {
 
     expect(c.req.json).toHaveBeenCalled()
     expect(mockQuery).toHaveBeenCalledWith(
-      'INSERT INTO stratmaps (title, description, map, "created_at") VALUES ($1, $2, $3, NOW()) RETURNING *',
-      [body.title, body.description, body.map]
+      'INSERT INTO stratmaps (title, description, "created_at") VALUES ($1, $2, NOW()) RETURNING *',
+      [body.title, body.description]
     )
     expect(res).toEqual({
       data: { status: 'success', data: inserted },
@@ -72,7 +71,7 @@ describe('createStratmap', () => {
     expect(res).toEqual({
       data: {
         status: 'error',
-        message: 'Title, description, and map are required',
+        message: 'Title and description are required',
       },
       status: 404,
     })
@@ -233,8 +232,8 @@ describe('updateStratmap', () => {
   })
 
   it('should update a stratmap and return 200', async () => {
-    const body = { title: 'Updated Title', description: 'Original Desc', map: 'Original Map' }
-    const updated = { id: 1, title: body.title, description: body.description, map: body.map }
+    const body = { title: 'Updated Title', description: 'Original Desc' }
+    const updated = { id: 1, title: body.title, description: body.description }
     mockQuery.mockResolvedValueOnce({ rows: [updated] })
 
     const c = mockUpdateContext(1, body)
@@ -243,8 +242,8 @@ describe('updateStratmap', () => {
     expect(c.req.param).toHaveBeenCalledWith('id')
     expect(c.req.json).toHaveBeenCalled()
     expect(mockQuery).toHaveBeenCalledWith(
-      'UPDATE stratmaps SET title = $1, description = $2, map = $3, "updated_at" = NOW() WHERE id = $4 RETURNING *',
-      [body.title, body.description, body.map, 1]
+      'UPDATE stratmaps SET title = $1, description = $2, "updated_at" = NOW() WHERE id = $3 RETURNING *',
+      [body.title, body.description, 1]
     )
     expect(res).toEqual({
       data: { status: 'success', data: updated },

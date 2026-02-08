@@ -33,6 +33,33 @@ export async function requireAuth(c: Context, next: Next) {
     return c.json({ error: "Invalid token payload" }, 401);
   }
 
+  let email: string | null = (payload.email as string) ?? null;
+  let username: string | null =
+    (payload.nickname as string) ??
+    (payload.preferred_username as string) ??
+    (payload.username as string) ??
+    null;
+
+  if ((!email || !username) && token) {
+    try {
+      const userInfoRes = await fetch(`https://${domain}/userinfo`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (userInfoRes.ok) {
+        const userInfo = (await userInfoRes.json()) as {
+          email?: string;
+          nickname?: string;
+          preferred_username?: string;
+          name?: string;
+        };
+        email ??= userInfo.email ?? null;
+        username ??=
+          userInfo.nickname ?? userInfo.preferred_username ?? userInfo.name ?? null;
+      }
+    } catch {
+    }
+  }
+
   const result = await pool.query(
     `
     INSERT INTO users (auth0_sub, email, username, created_at)
@@ -40,14 +67,10 @@ export async function requireAuth(c: Context, next: Next) {
     ON CONFLICT (auth0_sub)
     DO UPDATE SET
       email = EXCLUDED.email,
-      username = EXCLUDED.username,
+      username = EXCLUDED.username
     RETURNING *;
     `,
-    [
-      auth0Sub,
-      payload.email ?? null,
-      payload.username ?? null,
-    ]
+    [auth0Sub, email, username]
   );
 
   const dbUser = result.rows[0];

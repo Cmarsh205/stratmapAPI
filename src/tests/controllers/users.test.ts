@@ -5,8 +5,6 @@ import type { User } from '../../types.js'
 type QueryResult = { rows: any[] }
 const mockQuery = jest.fn<(...args: any[]) => Promise<QueryResult>>()
 
-// IMPORTANT: controllers import `pool` from `../database/database.js` (ESM),
-// so we mock that module before importing the controller under test.
 await jest.unstable_mockModule('../../database/database.js', () => ({
   pool: {
     query: mockQuery,
@@ -234,8 +232,8 @@ describe('updateUser', () => {
     const updated = { user_id: 1, username: 'Tommy', email: 'tom@mail.com' }
 
     mockQuery
-      .mockResolvedValueOnce({ rows: [existing] }) // SELECT current
-      .mockResolvedValueOnce({ rows: [updated] }) // UPDATE
+      .mockResolvedValueOnce({ rows: [existing] }) 
+      .mockResolvedValueOnce({ rows: [updated] }) 
 
     const body = { username: 'Tommy' }
     const c = mockUpdateContext(1, body)
