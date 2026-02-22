@@ -23,6 +23,7 @@ app.get('/', c => c.text('Hono User API Running 🚀'))
 app.use('/api/v1/users/*', requireAuth)
 app.route('/api/v1/users', userRouter)
 
+app.use('/api/v1/stratmaps', requireAuth)
 app.use('/api/v1/stratmaps/*', requireAuth)
 app.route('/api/v1/stratmaps', stratmapRouter)
 

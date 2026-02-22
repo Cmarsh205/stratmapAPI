@@ -75,9 +75,34 @@ export async function requireAuth(c: Context, next: Next) {
 
   const dbUser = result.rows[0];
 
+  const displayName = username ?? email ?? "User";
+  const privateTeamName = `${displayName}'s private team`;
+  const teamCheck = await pool.query(
+    `SELECT id FROM teams WHERE owner_id = $1 AND name = $2`,
+    [dbUser.id, privateTeamName]
+  );
+  let privateTeamId: string;
+  if (teamCheck.rows.length === 0) {
+    const teamResult = await pool.query(
+      `INSERT INTO teams (name, owner_id, created_at)
+       VALUES ($1, $2, NOW())
+       RETURNING id`,
+      [privateTeamName, dbUser.id]
+    );
+    privateTeamId = teamResult.rows[0].id;
+    await pool.query(
+      `INSERT INTO team_members (team_id, user_id, role, joined_at)
+       VALUES ($1, $2, 'owner', NOW())`,
+      [privateTeamId, dbUser.id]
+    );
+  } else {
+    privateTeamId = teamCheck.rows[0].id;
+  }
+
   c.set("auth0User", payload);
   c.set("dbUser", dbUser);
   c.set("dbUserId", dbUser.id);
+  c.set("privateTeamId", privateTeamId);
 
   await next();
 }
