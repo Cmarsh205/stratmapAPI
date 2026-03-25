@@ -8,5 +8,6 @@ router.get('/:id', StratmapController.getStratmap)
 router.post('/', StratmapController.createStratmap)
 router.put('/:id', StratmapController.updateStratmap)
 router.delete('/:id', StratmapController.deleteStratmap)
+router.post('/:id/share', StratmapController.shareStratmap)
 
 export default router

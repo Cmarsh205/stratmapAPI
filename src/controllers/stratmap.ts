@@ -101,3 +101,119 @@ export const deleteStratmap = async (c: Context) => {
     if (!result.rows.length) return c.json({ status: 'error', message: 'Stratmap not found' }, 404)
     return c.json({ status: 'success', message: 'Stratmap deleted' }, 200)
 }
+
+// POST share stratmap to all members of a selected team (creates copies in each recipient's private team).
+// The requester (original owner on their saved strats page) is excluded to avoid duplicates.
+export const shareStratmap = async (c: Context) => {
+    const id = c.req.param('id')
+    const privateTeamId = c.get('privateTeamId') as string
+    const dbUserId = c.get('dbUserId') as number
+
+    const body = await c.req.json<{ teamId?: string }>()
+    const teamId = body.teamId
+    if (!teamId?.trim()) {
+        return c.json({ status: 'error', message: 'teamId is required' }, 400)
+    }
+
+    // Ensure the strat belongs to the requester (their private team).
+    const stratRes = await pool.query<
+        Pick<Stratmap, 'title' | 'description' | 'data'>
+    >(
+        'SELECT title, description, data FROM stratmaps WHERE id = $1 AND team_id = $2',
+        [id, privateTeamId]
+    )
+
+    if (!stratRes.rows.length) {
+        return c.json({ status: 'error', message: 'Stratmap not found' }, 404)
+    }
+
+    // Ensure requester is a member of the target team.
+    const requesterMemberRes = await pool.query(
+        'SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2',
+        [teamId, dbUserId]
+    )
+
+    if (!requesterMemberRes.rows.length) {
+        return c.json({ status: 'error', message: 'You do not have access to this team' }, 403)
+    }
+
+    // Recipients are all team members except the requester.
+    const recipientsRes = await pool.query<{ user_id: number }>(
+        'SELECT user_id FROM team_members WHERE team_id = $1 AND user_id <> $2',
+        [teamId, dbUserId]
+    )
+
+    if (!recipientsRes.rows.length) {
+        return c.json({ status: 'success', data: { createdCount: 0 } }, 200)
+    }
+
+    const { title, description, data } = stratRes.rows[0]
+
+    // Insert a copy into each recipient's private team.
+    let createdCount = 0
+
+    for (const recipient of recipientsRes.rows) {
+        // Private team naming convention: "<displayName>'s private team"
+        let recipientPrivateTeam = await pool.query<{ id: string }>(
+            "SELECT id FROM teams WHERE owner_id = $1 AND name ILIKE '%private team%' LIMIT 1",
+            [recipient.user_id]
+        )
+
+        if (!recipientPrivateTeam.rows.length) {
+            // Create the recipient's private team if it doesn't exist yet.
+            const recipientUser = await pool.query<{
+                username: string | null
+                email: string | null
+            }>('SELECT username, email FROM users WHERE id = $1', [recipient.user_id])
+
+            const displayName =
+                recipientUser.rows[0]?.username ??
+                recipientUser.rows[0]?.email ??
+                'User'
+
+            const privateTeamName = `${displayName}'s private team`
+
+            const createdTeam = await pool.query<{ id: string }>(
+                `
+                INSERT INTO teams (name, owner_id, created_at)
+                VALUES ($1, $2, NOW())
+                RETURNING id
+                `,
+                [privateTeamName, recipient.user_id]
+            )
+
+            recipientPrivateTeam = createdTeam
+
+            await pool.query(
+                `
+                INSERT INTO team_members (team_id, user_id, role, joined_at)
+                VALUES ($1, $2, 'owner', NOW())
+                `,
+                [recipientPrivateTeam.rows[0].id, recipient.user_id]
+            )
+        }
+
+        await pool.query(
+            `
+            INSERT INTO stratmaps
+              (team_id, created_by, title, description, data, created_at, updated_at)
+            VALUES
+              ($1, $2, $3, $4, $5, NOW(), NOW())
+            `,
+            [
+                recipientPrivateTeam.rows[0].id,
+                recipient.user_id,
+                title,
+                description,
+                JSON.stringify(data ?? {}),
+            ]
+        )
+
+        createdCount += 1
+    }
+
+    return c.json(
+        { status: 'success', data: { createdCount } },
+        200
+    )
+}
