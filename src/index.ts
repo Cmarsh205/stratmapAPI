@@ -40,7 +40,7 @@ app.route('/api/v1/teams', teamRouter)
 serve(
   {
     fetch: app.fetch,
-    port: 80,
+    port: Number(process.env.PORT) || 80,
   },
   info => {
     console.log(`Server is running on http://localhost:${info.port}`)
